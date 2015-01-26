@@ -1,0 +1,263 @@
+.pm {
+  position: absolute;
+  text-align: center;
+  background-color: #33333C;
+  border-radius: 0.25em;
+  opacity: 0;
+
+  &:before {
+    content: '';
+    position: absolute;
+    width: 0.75em;
+    height: 0.75em;
+    background-color: inherit;
+    transform:
+      translate(-50%, -50%)
+      rotate(45deg);
+  }
+  
+  &--top {
+    transform: translate(-50%, -50%);
+    margin-top: -0.5em;
+
+    &:before {
+      top: 100%;
+      left: 50%;
+    }
+
+    &.pm--show {
+      transform: translate(-50%, -100%);
+    }
+  }
+
+  &--bottom {
+    transform: translate(-50%, -50%);
+    margin-top: 0.5em;
+
+    &:before {
+      top: 0;
+      left: 50%;
+    }
+
+    &.pm--show {
+      transform: translate(-50%, 0);
+    }
+  }
+
+  &--left {
+    transform: translate(-50%, -50%);
+    margin-left: -0.5em;
+
+    &:before {
+      top: 50%;
+      left: 100%;
+    }
+
+    &.pm--show {
+      transform: translate(-100%, -50%);
+    }
+    
+    li:last-child {
+      transform: rotate(-90deg);
+    }
+  }
+
+  &--right {
+    transform: translate(-50%, -50%);
+    margin-left: 0.5em;
+
+    &:before {
+      top: 50%;
+      left: 0;
+    }
+
+    &.pm--show {
+      transform: translate(0, -50%);
+    }
+  }
+
+  ul {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+  }
+
+  li {
+    display: inline-block;
+    
+    &:last-child {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      min-width: 100%;
+      display: none;
+      transform: translate(-50%, 100%);
+    }
+  }
+
+  &--left li, &--right li {
+    display: block;
+    
+    button[data-type=input] {
+      display: none;  
+    }
+  }
+
+  button {
+    width: 100%;
+    height: 100%;
+    border: none;
+    cursor: pointer;
+    background-color: transparent;
+    -webkit-appearance: none;
+    /* cannot inherit line-height due to specificity */
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+
+    &:focus {
+      outline: none;
+    }
+  }
+  
+  input {
+    border: none;
+    background-color: transparent;
+    -webkit-appearance: none;
+    /* cannot inherit line-height due to specificity */
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    
+    &:focus {
+      outline: none;
+    }
+  }
+  
+  &.pm--input li {
+    visibility: hidden;
+    
+    &:last-child {
+      visibility: visible;
+      transform: translate(-50%, 0);
+      transition: transform 200ms;
+    }
+  }
+}
+
+.pm--show {
+  opacity: 0.9;
+  transition:
+    width 100ms,
+    opacity 100ms,
+    transform 200ms,
+    top 100ms,
+    left 100ms;
+}
+
+.pm__btn {
+  padding: 0 0.5em;
+  line-height: 2em;
+  color: #FFF;
+
+  &--first {
+    padding-left: 1em;
+  }
+
+  &--last {
+    padding-right: 1em;
+  }
+
+  &.active {
+    color: #88F;
+  }
+
+  .pm--left &, .pm--right & {
+    padding: 0.5em 0;
+    line-height: 1;
+    width: 2em;
+
+    &--first {
+      padding-top: 0.75em;
+    }
+
+    &--last {
+      padding-bottom: 0.75em;
+    }
+  }
+}
+
+.pm__control {
+  min-width: 12em;
+  line-height: 2em;
+  padding: 0 0.5em;
+  color: #AAA;
+  
+  &::-webkit-input-placeholder {
+    color: inherit;
+  }
+
+  &::-moz-placeholder {
+    color: inherit;
+  }
+
+  &:-ms-input-placeholder {  
+    color: inherit;
+  }
+}
+
+.pm__cancel {
+  position: absolute;
+  top: 50%;
+  right: 0.5em;
+  height: 1em;
+  width: 1em;
+  color: #888;
+  cursor: pointer;
+  transform: translatey(-50%);
+  transition: transform 200ms;
+  
+  &:before, &:after {
+    content: '';
+    height: 0.75em;
+    border-right: 1px solid;
+    top: 50%;
+    position: absolute;
+    left: 50%;
+  }
+  
+  &:before {
+    transform:
+      translate(-50%, -50%)
+      rotate(45deg);
+  }
+  
+  &:after {
+    transform:
+      translate(-50%, -50%)
+      rotate(-45deg);
+  }
+  
+  &:hover {
+    transform: 
+      translatey(-50%)
+      rotate(90deg);
+  }
+}
+
+// link and unlink behavior
+
+.pm__btn.link.active {
+  display: none;
+}
+
+.pm__btn.unlink {
+  display: none;
+
+  &.active {
+    display: block;
+  }
+}
