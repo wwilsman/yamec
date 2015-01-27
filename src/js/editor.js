@@ -16,18 +16,70 @@ class Editor {
 
     this.dom = el;
     this.dom.setAttribute('contentEditable', true);
+
     this.selection = new Selection();
     this.commands = {};
-    this.initToolbar();
-    this.addEvents();
+    this.events = {};
+
+    this.initToolbar()
+        .addEvents();
   }
 
+  // returns the element the cursor is within
+  getContext() {
+    var ctxElement = this.selection.range.commonAncestorContainer;
+
+    // we want to return an element
+    while (ctxElement.nodeType !== 1) {
+      ctxElement = ctxElement.parentNode;
+    }
+
+    return ctxElement;
+  }
+
+  // registers a command (or commands)
+  registerCommand(cmds/*, func*/) {
+
+    // if `cmds` is a a string, turn arguments into an object
+    if (typeof cmds === 'string') {
+      let cmd = cmds, func = arguments[1];
+      (cmds = {})[cmd] = func;
+    }
+
+    // add commands
+    for (let cmd of _.keys(cmds)) {
+      this.commands[cmd] = this.commands[cmd] || [];
+      this.commands[cmd].push(cmds[cmd]);
+    }
+  }
+
+  // unregisters a command
+  unregisterCommand(cmd, func) {
+    var cmds, index;
+
+    if (cmds = this.commands[cmd]) {
+
+      // delete all if `func` not passed
+      if (func === undefined) {
+        delete this.commands[cmd];
+
+      // delete specific function if it exists
+      } else if ((index = cmds.indexOf(func)) !== -1) {
+        cmds.splice(index, 1);
+
+        // remove from `commands` if empty
+        if (cmds.length === 0) {
+          delete this.commands[cmd];
+        }
+      }
+    }
+  }
+
+  // preforms the command (`document.execCommand` by default)
   execCommand(cmd, value, collapse) {
 
-    // if command requires input, restore selection first
-    if (value) {
-      this.selection.restore();
-    }
+    // restore selection first (in case command required input)
+    this.selection.restore();
 
     // defer command to wait for selection to restore
     _.defer(() => {
@@ -55,45 +107,97 @@ class Editor {
     });
   }
 
-  registerCommand(cmds/*, func*/) {
+  // add event listeners
+  on(names, func) {
 
-    // if `cmds` is a a string, turn arguments into an object
-    if (typeof cmds === 'string') {
-      let cmd = cmds, func = arguments[1];
-      (cmds = {})[cmd] = func;
+    // split names into an array
+    names = names.split(' ');
+
+    // add events
+    for (let name of names) {
+      this.events[name] = this.events[name] || [];
+      this.events[name].push(func);
     }
 
-    // add commands
-    for (let cmd of _.keys(cmds)) {
-      this.commands[cmd] = this.commands[cmd] || [];
-      this.commands[cmd].push(cmds[cmd]);
-    }
+    return this;
   }
 
-  unregisterCommand(cmd, func) {
-    var cmds, index;
+  // remove event listeners
+  off(names, func) {
+    var funcs, index;
 
-    if (cmds = this.commands[cmd]) {
+    // split names into an array
+    names = names.split(' ');
 
-      // delete all if `func` not passed
-      if (func === undefined) {
-        delete this.commands[cmd];
+    for (let name of names) { 
+      if (funcs = this.events[name]) {
 
-      // delete specific function if it exists
-      } else if ((index = cmds.indexOf(func)) !== -1) {
-        cmds.splice(index, 1);
+        // delete all if `func` not passed
+        if (func === undefined) {
+          delete this.events[name];
 
-        // remove from `commands` if empty
-        if (cmds.length === 0) {
-          delete this.commands[cmd];
+        // delete specific function if it exists
+        } else if ((index = funcs.indexOf(func)) !== -1) {
+          funcs.splice(index, 1);
+
+          // remove from `events` if empty
+          if (funcs.length === 0) {
+            delete this.events[name];
+          }
         }
       }
     }
+
+    return this;
   }
 
-  initToolbar(opts) {
-    // testing
+  // trigger events attached to the editor
+  trigger(name) {
+    var funcs;
 
+    if (funcs = this.events[name]) {
+      for (let func of funcs) {
+        func.apply(this, _.slice(arguments, 1));
+      }
+    }
+
+    return this;
+  }
+
+  // hook into DOM events and set some defaults
+  addEvents() {
+    var
+
+      // wrapper to trigger editor events
+      fireEvent = event => {
+        this.trigger(event.type, event);
+      },
+
+      // DOM events to hook into
+      domEvents = [
+        'mouseup', 'mousedown', 'click',
+        'mouseover', 'mouseout',
+        'keyup', 'keydown', 'keypress', 
+        'focus', 'blur'
+      ];
+
+    // hook into DOM events
+    for (let evt of domEvents) {
+      this.dom.addEventListener(evt, fireEvent);
+    }
+
+    // default events
+
+    // show toolbar when a selection might be made
+    this.on('mouseup keyup', this.showToolbar);
+
+    return this;
+  }
+
+  // registers some default commands and initializes the toolbar
+  initToolbar(opts) {
+
+    // register some helpful commands
     this.registerCommand({
 
       // toggle link action
@@ -152,6 +256,8 @@ class Editor {
       }
     });
 
+    // testing
+
     var commandWrapper = (cmd, value) => {
       return () => {
         return this.execCommand(cmd, value);
@@ -167,13 +273,13 @@ class Editor {
         }
 
         // links & code
-        if (/a|code/.test(query)) {
+        if (/^(a|code)$/.test(query)) {
           return this.selection.contains(query) || 
             this.selection.isWithin(query);
         }
 
         // headings & blockquote
-        if (/h(2|3)|blockquote/.test(query)) {
+        if (/^(h(2|3)|blockquote)$/.test(query)) {
           return this.selection.isWithin(query);
         }
 
@@ -217,55 +323,57 @@ class Editor {
         active: queryWrapper('code')
       }]
     });
+
+    return this;
   }
 
-  addEvents() {
-    this.dom.addEventListener('mouseup', () => {
-      _.defer(() => this.showToolbar());
-    });
-  }
-
+  // shows the toolbar (hides if no selection)
+  // TODO: add context argument to show/hide different toolbars
   showToolbar() {
     var boundary, toolbarHeight, toolbarHalfWidth,
       point = {};
 
+    // save selection in case focus changes later
     this.selection.save();
     
+    // hide the toolbar if nothing is selected
     if (this.selection.isCollapsed) {
       this.toolbar.hide();
       return;
     }
 
+    // get starting points for toolbar
     boundary = this.selection.getRangeBoundary();
     point.x = (boundary.left + boundary.right) / 2;
     point.y = window.pageYOffset;
 
+    // get dimensions of toolbar
     this.toolbar.dom.style.display = 'block';
     toolbarHeight = this.toolbar.dom.offsetHeight;
     toolbarHalfWidth = this.toolbar.dom.offsetWidth / 2;
     this.toolbar.dom.style.display = '';
 
-    // center focus under selection
+    // center toolbar under selection
     if (boundary.top < toolbarHeight) {
       this.toolbar.position('bottom');
       point.y += boundary.bottom;
 
-    // center focus above selection
+    // center toolbar above selection
     } else {
       this.toolbar.position('top');
       point.y += boundary.top;
     }
 
-    // snap to left edge
+    // snap toolbar to left edge
     if (point.x < toolbarHalfWidth) {
       point.x += toolbarHalfWidth - point.x;
 
-    // snap to right edge (adjusted for scrollbar)
+    // snap toolbar to right edge (adjusted for scrollbar)
     } else if (window.innerWidth - _.scrollbarWidth() - point.x < toolbarHalfWidth) {
       point.x -= toolbarHalfWidth - (window.innerWidth - point.x - _.scrollbarWidth());
-
     }
 
+    // show toolbar
     this.toolbar.show(point.x, point.y);
   }
 }
