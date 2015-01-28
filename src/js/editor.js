@@ -219,8 +219,9 @@ class Editor {
   }
 
   cleanContent() {
-    this.dom.innerHTML = this.serializer.serialize(this.dom).toHTML();
-    this.selection.restore(); // TODO: fix bug on empty paragraph
+    // TODO: Serializer causing some major bugs with the bugged restore
+    // this.dom.innerHTML = this.serializer.serialize(this.dom).toHTML();
+    // this.selection.restore(); // TODO: fix bug on empty paragraph
     return this;
   }
 
