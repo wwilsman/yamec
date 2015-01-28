@@ -1,6 +1,7 @@
 import _ from './helpers';
 import Selection from './selection';
 import EditorToolbar from './editor-toolbar';
+import EditorSerializer from './editor-serializer';
 
 class Editor {
   constructor(el) {
@@ -18,12 +19,14 @@ class Editor {
     this.dom.setAttribute('contentEditable', true);
 
     this.selection = new Selection();
+    this.serializer = new EditorSerializer();
     this.toolbars = {};
     this.commands = {};
     this.events = {};
 
     this.initToolbar()
-        .addEvents();
+        .addEvents()
+        .cleanContent();
   }
 
   // returns the element the cursor is within
@@ -100,6 +103,9 @@ class Editor {
       if (collapse) {
         this.selection.collapseToEnd();
       }
+
+      // trigger any events
+      this.trigger('execcommand', cmd);
 
       // toggle toolbar
       // TODO: Remove the toolbar from this logic
@@ -205,6 +211,16 @@ class Editor {
     // show toolbar when a selection might be made
     this.on('mouseup keyup', 'toolbar:inline');
 
+    // serialize the DOM 1 second after these events stop firing
+    this.on('execcommand keydown keypress keyup',
+      _.debounce(this.cleanContent, 1000).bind(this));
+
+    return this;
+  }
+
+  cleanContent() {
+    this.dom.innerHTML = this.serializer.serialize(this.dom).toHTML();
+    this.selection.restore(); // TODO: fix bug on empty paragraph
     return this;
   }
 
@@ -369,7 +385,7 @@ class Editor {
         point = {};
 
       // save selection in case focus changes later
-      this.selection.save();
+      this.selection.save(this.dom);
       
       // hide the toolbar if nothing is selected
       if (this.selection.isCollapsed) {

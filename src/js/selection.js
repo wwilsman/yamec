@@ -13,11 +13,11 @@ class Selection {
     return window.getSelection();
   }
 
-  save() {
+  save(ctx) {
     var saved = [],
       range = this.range;
 
-    saved[0] = range.commonAncestorContainer;
+    saved[0] = ctx || range.commonAncestorContainer;
     saved[2] = this.getCaretOffset(saved[0]);
     saved[1] = saved[2] - range.toString().length;
 
@@ -25,7 +25,9 @@ class Selection {
   }
 
   restore() {
-    this.select.apply(this, this.saved);
+    if (this.saved) {
+      this.select.apply(this, this.saved);
+    }
   }
 
   getRangeBoundary() {

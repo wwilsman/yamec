@@ -4,54 +4,40 @@ const TAGREG = /^<([\w-]+)|\s+([\w-]+)(?:=?("|')(.*?)(\3))?/g;
 const EMPTYELEMENTREG = /hr|br|img/;
 const PHRASINGMODELREG = /p|pre/;
   
-class EditorContent {
-  constructor(el, opts) {
-    if (typeof el === 'string') {
-      el = document.querySelectorAll(el);
-    }
-
-    if (!_.isElement(el)) {
-      return _.slice.call(el).map(e => {
-        return new EditorContent(e, opts);
-      });
-    }
-
-    this.dom = el;
-    this.setOptions(opts);
-  }
-  
-  setOptions(opts = {}) {
+class EditorSerializer {
+  constructor(opts = {}) {
     var defaults = this.constructor.defaults;
     
     this.allowed = this.allowed || {};
     
     this.allowed.outer = 
       opts.outerElements ||   // new option
-      this.allowed.outer ||   // old option
       defaults.outerElements; // default
     
     this.allowed.inner = 
       opts.innerElements ||
-      this.allowed.inner ||
       defaults.innerElements;
     
     this.conversions = 
       opts.conversions ||
-      this.conversions ||
       defaults.conversions;
     
     this.stripAttributes = 
       opts.stripAttributes ||
-      this.stripAttributes ||
       defaults.stripAttributes;
   }
   
-  sanitizeElement(object, context) {
+  sanitizeElement(object, context, i) {
     var convertedTag,
       allowed = 
         context === this.elements ?
         this.allowed.outer :
         this.allowed.inner;
+
+    // remove empty elements (non self-closing)
+    if (object.content !== undefined && !object.content) {
+      delete context[i];
+    }
     
     // convert tag
     if ((convertedTag = this.conversions[object.tagName])) {
@@ -60,8 +46,7 @@ class EditorContent {
     
     // filter tag
     if (allowed.indexOf(object.tagName) === -1) {
-      console.log(`remove disallowed '${object.tagName}'`);
-      delete context[context.indexOf(object)];
+      delete context[i];
     }
     
     // strip attributes
@@ -72,13 +57,13 @@ class EditorContent {
     }
   }
     
-  serialize() {
+  serialize(dom) {
     var sanitizeChildren = (object, i, context) => {
-      this.sanitizeElement(object, context);
+      this.sanitizeElement(object, context, i);
     };
     
     // collect elements
-    this.elements = _.slice.call(this.dom.children).map(el => {
+    this.elements = _.slice.call(dom.children).map(el => {
       return this.serializeBlock(el);
     });
     
@@ -91,6 +76,8 @@ class EditorContent {
         blockObject.children.forEach(sanitizeChildren);
       }
     }
+
+    return this;
   }
   
   serializeBlock(element) {
@@ -210,6 +197,7 @@ class EditorContent {
 
           // self closing tag
           if (EMPTYELEMENTREG.test(object.tagName)) {
+            object.isVoid = true;
             delete object.content;
             addObject(object);
           }
@@ -222,10 +210,13 @@ class EditorContent {
     // last object is this element
     blockObject = objects.pop();
     blockObject.html = html;
-    blockObject.content = sanitized.join('');
-    blockObject.children = objects;
     delete blockObject.from;
     delete blockObject.to;
+
+    if (!blockObject.isVoid) {
+      blockObject.content = sanitized.join('');
+      blockObject.children = objects;
+    }
     
     return blockObject;
   }
@@ -234,8 +225,16 @@ class EditorContent {
     var html = '';
     
     this.elements.forEach(blockObject => {
-      var workingHTML = blockObject.content.split(''),
+      var workingHTML,
         blockTags = createTags(blockObject.tagName, blockObject.attributes);
+      
+      // void elements
+      if (blockObject.isVoid) {
+        html += blockTags.open;
+        return;
+      }
+
+      workingHTML = blockObject.content.split('');
       
       // empty text content
       if (workingHTML.length === 0) {
@@ -247,8 +246,8 @@ class EditorContent {
         
         workingHTML[object.from] = tags.open + workingHTML[object.from];
         
-        // empty elements
-        if (object.to) {
+        // non-void elements
+        if (!object.isVoid) {
           workingHTML[object.to] += tags.close;
         }
       });
@@ -260,11 +259,11 @@ class EditorContent {
   }
 }
 
-EditorContent.defaults = {
-  outerElements: ['h2', 'h3', 'p', 'figure', 'pre', 'hr', 'ul', 'ol'],
-  innerElements: ['b', 'i', 'a', 'q', 'code', 'mark'],
+EditorSerializer.defaults = {
+  outerElements: ['h2', 'h3', 'p', 'blockquote', 'figure', 'pre', 'hr', 'ul', 'ol'],
+  innerElements: ['b', 'i', 'u', 'a', 'q', 'code', 'mark', 'br'],
   conversions: { 'strong': 'b', 'em': 'i' },
-  stripAttributes: ['style']
+  stripAttributes: []
 };
 
 function createTags(tagName, attributes) {
@@ -287,4 +286,4 @@ function createTags(tagName, attributes) {
   return tags;
 }
 
-export default EditorContent;  
+export default EditorSerializer;  
